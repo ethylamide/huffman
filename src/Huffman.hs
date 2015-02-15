@@ -1,9 +1,7 @@
 import System.Environment
-import System.IO
 
 import Control.Monad
 
-import Data.Int
 import Data.Word
 import Data.Maybe
 
@@ -11,10 +9,8 @@ import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQueue
 import qualified Data.Map as Map
 
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Lazy as BS
 
-import Data.Binary
 import Data.Binary.Put as Put
 import Data.Binary.Get as Get
 
@@ -76,8 +72,8 @@ trieRight Empty = Nothing
 emptyFreqTable :: FreqTable
 emptyFreqTable = Map.fromList $ zip [0..255] $ repeat 0
 
-countFrequency :: LBS.ByteString -> FreqTable
-countFrequency bs = LBS.foldl (\t w -> Map.adjust (+1) w t) emptyFreqTable bs
+countFrequency :: BS.ByteString -> FreqTable
+countFrequency bs = BS.foldl (\t w -> Map.adjust (+1) w t) emptyFreqTable bs
 
 insertFreq :: Freq -> MinQueue Trie -> MinQueue Trie
 insertFreq x@(Freq _ f) pq = if f > 0
@@ -127,11 +123,11 @@ putTrie (Node (Freq _ _) l r) = do
   putTrie l
   putTrie r
 
-compress :: LBS.ByteString -> LBS.ByteString
+compress :: BS.ByteString -> BS.ByteString
 compress bs = runPut $ BPut.runBitPut $ do
   putTrie root
-  BPut.putWord32be 32 $ fromIntegral $ LBS.length bs
-  mapM_ (\w -> encodeHuffman (fromJust $ Map.lookup w codeTable)) (LBS.unpack bs)
+  BPut.putWord32be 32 $ fromIntegral $ BS.length bs
+  mapM_ (\w -> encodeHuffman (fromJust $ Map.lookup w codeTable)) (BS.unpack bs)
   where
     freqTable = countFrequency bs
     root = buildTrie freqTable
@@ -142,14 +138,14 @@ compress bs = runPut $ BPut.runBitPut $ do
     putCode 0 = BPut.putBool False
     putCode 1 = BPut.putBool True
 
-expand :: LBS.ByteString -> LBS.ByteString
+expand :: BS.ByteString -> BS.ByteString
 expand bs = runGet readInput bs
             where
               readInput = BGet.runBitGet $ do
                 root <- readTrie
                 len <- readLen
                 wordList <- replicateM len (decodeWord root)
-                return $ LBS.pack wordList
+                return $ BS.pack wordList
               decodeWord root = do
                 w <- wnLeaf root
                 return w
@@ -183,11 +179,11 @@ readTrie = do
       right <- readTrie
       return $ Node (Freq 0 0) left right
 
-parse :: [String] -> LBS.ByteString -> LBS.ByteString
+parse :: [String] -> BS.ByteString -> BS.ByteString
 parse ["-"] = compress
 parse ["+"] = expand
 
 main = do
   op <- getArgs
-  content <- LBS.getContents
-  LBS.putStr $ (parse op) $ content
+  content <- BS.getContents
+  BS.putStr $ (parse op) $ content
